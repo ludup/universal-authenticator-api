@@ -438,12 +438,4 @@ public class UniversalAuthenticatorClient {
 			throw new IOException(e.getMessage(), e);
 		}
 	}
-
-	public static void main(String[] args) {
-		
-		
-		UniversalAuthenticatorClient uac = new UniversalAuthenticatorClient();
-		
-		uac.register("user@domain.com", "My Web Server", "gateway.sshtools.com");
-	}
 }
