@@ -53,6 +53,18 @@ public class UniversalAuthenticatorClient {
 	}
 	
 	/**
+	 * Create an unregistered instance of the client. To authenticate a client must first
+	 * register with a key server and will need to call {@link registerDevice} before attempting
+	 * any authentication calls.
+	 */
+	public UniversalAuthenticatorClient(File propertiesFile) throws IOException {
+		this();
+		try(InputStream in = new FileInputStream(propertiesFile)) {
+			properties.load(in);
+		}
+	}
+	
+	/**
 	 * Create an instance of the client with a set of previously saved properties.
 	 * @param properties
 	 */
@@ -196,6 +208,17 @@ public class UniversalAuthenticatorClient {
 		try(OutputStream out = new FileOutputStream(toFile)) {
 			properties.store(out, "Saved by universal-authenticator-api");
 		}
+	}
+	
+	/**
+	 * Get the properties of this client.
+	 * 
+	 * @return
+	 */
+	public Properties getProperties() {
+		Properties tmp = new Properties();
+		tmp.putAll(properties);
+		return tmp;
 	}
 	
 	/**
