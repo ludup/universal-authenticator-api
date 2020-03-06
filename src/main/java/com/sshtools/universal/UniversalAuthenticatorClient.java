@@ -31,20 +31,41 @@ import com.sshtools.common.ssh.components.SshKeyPair;
 import com.sshtools.common.ssh.components.SshPublicKey;
 import com.sshtools.common.ssh.components.SshRsaPublicKey;
 
-@SuppressWarnings("restriction")
+/**
+ * A client for building authentication solutions that utilise the Universal Authenticator app
+ * from JADAPTIVE.
+ * 
+ * @author Lee Painter
+ *
+ */
 public class UniversalAuthenticatorClient {
 
 	private ScriptEngine engine;
 	private Properties properties;
 	
+	/**
+	 * Create an unregistered instance of the client. To authenticate a client must first
+	 * register with a key server and will need to call {@link registerDevice} before attempting
+	 * any authentication calls.
+	 */
 	public UniversalAuthenticatorClient() {
 		this(new Properties());
 	}
 	
+	/**
+	 * Create an instance of the client with a set of previously saved properties.
+	 * @param properties
+	 */
 	public UniversalAuthenticatorClient(Properties properties) {
 		this.properties = properties;
 	}
 	
+	/**
+	 * Refresh the current registration. This will re-key the configuration and create a new
+	 * authorization token.
+	 * 
+	 * @throws IOException
+	 */
 	public void refreshRegistration() throws IOException {
 		
 		String username = properties.getProperty("username", null);
@@ -55,14 +76,32 @@ public class UniversalAuthenticatorClient {
 			throw new IOException("Cannot reauthorize as the configuration does not look to have been authorized yet");
 		}
 		
-		registerDevice(username, deviceName, hostname, true);
+		register(username, deviceName, hostname, true);
 	}
 	
-	public void registerDevice(String username, String deviceName, String hostname, boolean forceOverwrite) throws IOException {
-		registerDevice(username, deviceName, hostname, 443, true, forceOverwrite);
+	/**
+	 * Register the authentication client with the users key server.
+	 * @param username
+	 * @param deviceName
+	 * @param hostname
+	 * @param forceOverwrite
+	 * @throws IOException
+	 */
+	public void register(String username, String deviceName, String hostname, boolean forceOverwrite) throws IOException {
+		register(username, deviceName, hostname, 443, true, forceOverwrite);
 	}
 
-	public void registerDevice(String username, String deviceName, String hostname, int port, boolean strictSSL, boolean forceOverwrite) throws IOException {
+	/**
+	 * Register the authentication client with the users key server.
+	 * @param username
+	 * @param deviceName
+	 * @param hostname
+	 * @param port
+	 * @param strictSSL
+	 * @param forceOverwrite
+	 * @throws IOException
+	 */
+	public void register(String username, String deviceName, String hostname, int port, boolean strictSSL, boolean forceOverwrite) throws IOException {
 		
 		SshKeyPair pair;
 		try {
@@ -92,9 +131,8 @@ public class UniversalAuthenticatorClient {
 					new RequestParameter("overwrite", String.valueOf(forceOverwrite)),
 					new RequestParameter("key", key));
 			
-			boolean success = (Boolean) response.get("success");
-			if(!success) {
-				throw new IOException((String)response.get("message"));
+			if(!isSuccess(response)) {
+				throw new IOException(getMessage(response));
 			}
 			
 			String previousToken = authorization;
@@ -113,14 +151,46 @@ public class UniversalAuthenticatorClient {
 			throw new IOException(e.getMessage(), e);
 		}			
 	}
+	
+	/**
+	 * Verify this clients registration. If the registration is not valid the client
+	 * cannot be used for authentication.
+	 * @return
+	 * @throws IOException
+	 */
+	public boolean verifyRegistration() throws IOException {
+
+		String username = properties.getProperty("username");
+		String token = properties.getProperty("authorization");
+		
+		if(Objects.isNull(username) || Objects.isNull(token)) {
+			throw new IOException("Username and token not set. Has this configuration been authorized?");
+		}
+		
+		String hostname = properties.getProperty("hostname");
+		
+		if(Objects.isNull(hostname)) {
+			throw new IOException("Hostname not set. Has this configuration been authorized?");
+		}
+		
+
+		return isSuccess(fetchURL("/app/api/agent/check", 
+				new RequestParameter("username", username),
+				new RequestParameter("token", token)));
+	}
 	 
 	private boolean verifyDevice(String deviceName, String authorization) throws IOException {
-		Map<String,Object> response = fetchURL("/app/api/agent/verify/" + deviceName + "/",
-				new RequestParameter("authorization", authorization));
-	
-		return (Boolean) response.get("success");
+		return isSuccess(fetchURL("/app/api/agent/verify/" + deviceName + "/",
+				new RequestParameter("authorization", authorization)));
 	}
 	
+	/**
+	 * Save the authentication client properties to file. This file should be kept
+	 * secure with owner only read/write.
+	 * 
+	 * @param toFile
+	 * @throws IOException
+	 */
 	public void save(File toFile) throws IOException {
 
 		try(OutputStream out = new FileOutputStream(toFile)) {
@@ -128,16 +198,37 @@ public class UniversalAuthenticatorClient {
 		}
 	}
 	
-	public boolean authenticate() throws IOException {
+	/**
+	 * Authenticate the user. 
+	 * 
+	 * This will perform an authentication with the Universal Authenticator app, generating 
+	 * a random payload and verifying that the response has been signed by a key on the users
+	 * Universal Authenticator.
+	 * @param authorizationText
+	 * @return
+	 * @throws IOException
+	 */
+	public boolean authenticate(String authorizationText) throws IOException {
 		
 		byte[] tmp = new byte[512];
 		new SecureRandom().nextBytes(tmp);
 		
-		return authenticate(tmp);
+		return authenticate(tmp, authorizationText);
 		
 	}
 	
-	public boolean authenticate(byte[] payload) throws IOException {
+	/**
+	 * Authenticate the user. 
+	 * 
+	 * This will perform an authentication with the Universal Authenticator app, using
+	 * the provided payload and verifying that the response has been signed by a key on the users
+	 * Universal Authenticator.
+	 * @param payload
+	 * @param authorizationText
+	 * @return
+	 * @throws IOException
+	 */
+	public boolean authenticate(byte[] payload, String authorizationText) throws IOException {
 		
 		verifyRegistration();
 		
@@ -150,6 +241,7 @@ public class UniversalAuthenticatorClient {
 					new RequestParameter("flags", String.valueOf((key instanceof SshRsaPublicKey) ? 4 : 0)),
 					new RequestParameter("fingerprint", SshKeyUtils.getFingerprint(key)),
 					new RequestParameter("remoteName", properties.getProperty("deviceName")),
+					new RequestParameter("text", authorizationText),
 					new RequestParameter("payload", Base64.getUrlEncoder().encodeToString(payload)));
 			
 			if(!isSuccess(response)) {
@@ -176,10 +268,9 @@ public class UniversalAuthenticatorClient {
 		
 		Map<String,Object> response = fetchURL(
 				String.format("/app/api/userPrivateKeys/systemKey/%s", properties.getProperty("username")));
-		
-		boolean success = (Boolean) response.get("success");
-		if(!success) {
-			throw new IOException((String)response.get("message"));
+
+		if(!isSuccess(response)) {
+			throw new IOException(getMessage(response));
 		}
 
 		return SshKeyUtils.getPublicKey((String) response.get("resource"));
@@ -278,30 +369,6 @@ public class UniversalAuthenticatorClient {
 		return buffer.toString().getBytes("UTF-8");
 	}
 	
-	public boolean verifyRegistration() throws IOException {
-
-		String username = properties.getProperty("username");
-		String token = properties.getProperty("authorization");
-		
-		if(Objects.isNull(username) || Objects.isNull(token)) {
-			throw new IOException("Username and token not set. Has this configuration been authorized?");
-		}
-		
-		String hostname = properties.getProperty("hostname");
-		
-		if(Objects.isNull(hostname)) {
-			throw new IOException("Hostname not set. Has this configuration been authorized?");
-		}
-		
-		int port = Integer.parseInt(properties.getProperty("port", "443"));
-		
-		Map<String,Object> response = fetchURL("/app/api/agent/check", 
-				new RequestParameter("username", username),
-				new RequestParameter("token", token));
-		
-		return (Boolean)response.get("success");
-	}
-	
 	@SuppressWarnings("unchecked")
 	private boolean parseJSON(String json, List<Object> results) throws IOException {
 		
@@ -324,20 +391,5 @@ public class UniversalAuthenticatorClient {
 			throw new IOException(e.getMessage(), e);
 		}
 	}
-	
-	public static void main(String[] args) throws IOException {
-		
-		Properties properties = new Properties();
-//		properties.load(new FileInputStream(new File("agent.properties")));
-		
-		UniversalAuthenticatorClient c = new UniversalAuthenticatorClient(properties);
 
-		c.registerDevice("t1@jadaptive.com", "UNI-API", "gateway2.sshtools.com", true);
-		System.out.println(c.verifyRegistration());
-		
-		c.save(new File("agent.properties"));
-		
-		System.out.println(c.authenticate());
-
-	}
 }
