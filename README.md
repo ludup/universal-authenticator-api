@@ -1,5 +1,5 @@
 # Universal Authenticator Java API
-Universal Authenticator is a mobile app developed by JADAPTIVE Limited. The app supports several authentication mechanisms, including SSH public-key authentication, Webauthn, TOTP, and it's own native mechanism. 
+Universal Authenticator is a mobile app developed by JADAPTIVE Limited https://www.jadaptive.com. The app supports several authentication mechanisms, including SSH public-key authentication, Webauthn, TOTP, and it's own native mechanism. 
 
 This API enables the creation of authentication solutions using the native method. It is suitable for server solutions that want to integrate native Universal Authentication into their authentication process. 
 
