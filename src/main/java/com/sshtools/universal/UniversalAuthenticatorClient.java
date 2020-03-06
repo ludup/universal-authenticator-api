@@ -92,7 +92,31 @@ public class UniversalAuthenticatorClient {
 	}
 	
 	/**
+	 * Register the authentication client.
+	 * 
+	 * @param username
+	 * @param deviceName
+	 * @throws IOException
+	 */
+	public void register(String username, String deviceName) throws IOException {
+		register(username, deviceName, "gateway.sshtools.com", true);
+	}
+	
+	/**
+	 * Register the authentication client.
+	 * 
+	 * @param username
+	 * @param deviceName
+	 * @param hostname
+	 * @throws IOException
+	 */
+	public void register(String username, String deviceName, String hostname) throws IOException {
+		register(username, deviceName, hostname, true);
+	}
+	
+	/**
 	 * Register the authentication client with the users key server.
+	 * 
 	 * @param username
 	 * @param deviceName
 	 * @param hostname
@@ -415,4 +439,11 @@ public class UniversalAuthenticatorClient {
 		}
 	}
 
+	public static void main(String[] args) {
+		
+		
+		UniversalAuthenticatorClient uac = new UniversalAuthenticatorClient();
+		
+		uac.register("user@domain.com", "My Web Server", "gateway.sshtools.com");
+	}
 }
