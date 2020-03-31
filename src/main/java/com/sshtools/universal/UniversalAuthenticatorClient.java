@@ -24,6 +24,7 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
+import com.sshtools.common.publickey.InvalidPassphraseException;
 import com.sshtools.common.publickey.SshKeyPairGenerator;
 import com.sshtools.common.publickey.SshKeyUtils;
 import com.sshtools.common.ssh.SshException;
@@ -281,24 +282,34 @@ public class UniversalAuthenticatorClient {
 		
 		try {
 			SshPublicKey key = getSystemKey();
+			SshKeyPair pair = SshKeyUtils.getPrivateKey(properties.getProperty("privateKey"), null);
+			String username = properties.getProperty("username");
+			long timestamp = System.currentTimeMillis();
+			String authorization = properties.getProperty("authorization");
+			byte[] token = generateAuthorization(1, timestamp, authorization, username);
+			byte[] sig = pair.getPrivateKey().sign(token);
 			
 			Map<String,Object> response = fetchURL("/app/api/agent/signPayload", 
-					new RequestParameter("username", properties.getProperty("username")),
-					new RequestParameter("token", properties.getProperty("authorization")),
+					new RequestParameter("username", username),
+					new RequestParameter("signature", Base64.getUrlEncoder().encodeToString(sig)),
+					new RequestParameter("token", authorization),
 					new RequestParameter("flags", String.valueOf((key instanceof SshRsaPublicKey) ? 4 : 0)),
 					new RequestParameter("fingerprint", SshKeyUtils.getFingerprint(key)),
 					new RequestParameter("remoteName", properties.getProperty("deviceName")),
 					new RequestParameter("text", authorizationText),
+					new RequestParameter("version", "1"),
+					new RequestParameter("timestamp", String.valueOf(timestamp)),
 					new RequestParameter("payload", Base64.getUrlEncoder().encodeToString(payload)));
 			
 			if(!isSuccess(response)) {
 				throw new IOException(getMessage(response));
 			}
 			
+			
 			String signature = (String) response.get("signature");
 			return key.verifySignature(Base64.getUrlDecoder().decode(signature), payload);
 		
-		} catch(SshException e) {
+		} catch(SshException | InvalidPassphraseException e) {
 			throw new IOException(e.getMessage(), e);
 		}
 	}
@@ -416,6 +427,20 @@ public class UniversalAuthenticatorClient {
 		return buffer.toString().getBytes("UTF-8");
 	}
 	
+	private byte[] generateAuthorization(int version, long timestamp, String token, String username) throws IOException {
+		
+		StringBuffer buffer = new StringBuffer();
+		buffer.append(version);
+		buffer.append("|");
+		buffer.append(timestamp);
+		buffer.append("|");
+		buffer.append(token);
+		buffer.append("|");
+		buffer.append(username);
+		
+		return buffer.toString().getBytes("UTF-8");
+	}
+	
 	@SuppressWarnings("unchecked")
 	private boolean parseJSON(String json, List<Object> results) throws IOException {
 		
@@ -437,5 +462,15 @@ public class UniversalAuthenticatorClient {
 		} catch (ScriptException e) {
 			throw new IOException(e.getMessage(), e);
 		}
+	}
+	
+	public static void main(String[] args) throws IOException {
+		
+		UniversalAuthenticatorClient uac = new UniversalAuthenticatorClient();
+		uac.register("t1@jadaptive.com", "Some Device", "gateway2.sshtools.com");
+		
+		uac.verifyRegistration();
+		
+		uac.authenticate("Some text");
 	}
 }
