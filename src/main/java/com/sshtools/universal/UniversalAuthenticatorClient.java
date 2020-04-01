@@ -256,12 +256,12 @@ public class UniversalAuthenticatorClient {
 	 * @return
 	 * @throws IOException
 	 */
-	public boolean authenticate(String authorizationText) throws IOException {
+	public void authenticate(String authorizationText) throws IOException {
 		
 		byte[] tmp = new byte[512];
 		new SecureRandom().nextBytes(tmp);
 		
-		return authenticate(tmp, authorizationText);
+		authenticate(tmp, authorizationText);
 		
 	}
 	
@@ -276,7 +276,7 @@ public class UniversalAuthenticatorClient {
 	 * @return
 	 * @throws IOException
 	 */
-	public boolean authenticate(byte[] payload, String authorizationText) throws IOException {
+	public void authenticate(byte[] payload, String authorizationText) throws IOException {
 		
 		verifyRegistration();
 		
@@ -305,9 +305,10 @@ public class UniversalAuthenticatorClient {
 				throw new IOException(getMessage(response));
 			}
 			
-			
 			String signature = (String) response.get("signature");
-			return key.verifySignature(Base64.getUrlDecoder().decode(signature), payload);
+			if(!key.verifySignature(Base64.getUrlDecoder().decode(signature), payload)) {
+				throw new IOException("The signature returned from the key server was invalid!");
+			}
 		
 		} catch(SshException | InvalidPassphraseException e) {
 			throw new IOException(e.getMessage(), e);
