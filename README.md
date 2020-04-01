@@ -23,7 +23,7 @@ This does not perform any authentication, it just checks that the authorization 
 Once returned, we can save the registration details to file.
 
 ```
-uac.save(new File("registration.properties"));
+uac.save(new File(username + ".properties"));
 ```
 
 If you prefer to store the details elsewhere, you can grab a Properties object which contains the following items
@@ -41,7 +41,7 @@ You should store these details securely as they contain sensitive information. S
 The user is now ready to start authenticating with their app. To authenticate the user, creating an instance of the API passing in the File or Properties object containing the registration details.
 
 ```
-UniversalAuthenticatorClient uac = new UniversalAuthenticatorClient(new File("registration.properties"));
+UniversalAuthenticatorClient uac = new UniversalAuthenticatorClient(new File(username + ".properties"));
 ```
 
 Call the authenticate method with some authorization text to display to the user, and optionally a binary payload to use as the authentication challenge. 
