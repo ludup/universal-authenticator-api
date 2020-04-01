@@ -47,9 +47,11 @@ UniversalAuthenticatorClient uac = new UniversalAuthenticatorClient(new File("re
 Call the authenticate method with some authorization text to display to the user, and optionally a binary payload to use as the authentication challenge. 
 
 ```
-boolean authenticated = uac.authenticate("Do you want to login to My Web Server?");
+uac.authenticate("Do you want to login to My Web Server?");
 ```
 
-The user will be prompted via the app to authorize the access attempt. When the user approves the request, the app signs the binary payload with its private key, which is verified by the API before returning a boolean result. If the method returns true, then authentication is safe, and you can log in the user to your solution. If false, the user has rejected the attempt, and login should not continue.
+The user will be prompted via the app to authorize the access attempt. When the user approves the request, the app signs the binary payload with its private key, which is verified by the API before returning. If the method returns without an exception, then authentication is safe, and you can log in the user to your solution. Otherwise an exception is raised with more context as to why the authentication failed. For example. the user has rejected the attempt, and login should not continue.
+
+I have implemented a full consumer example at https://github.com/ludup/universal-authenticator-consumer
 
 
