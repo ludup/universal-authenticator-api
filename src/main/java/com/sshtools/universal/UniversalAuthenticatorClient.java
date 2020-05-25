@@ -1,3 +1,22 @@
+/**
+ * Universal Authenticator API
+ * Copyright (C) 2020 JADAPTIVE Limited
+ * support@jadaptive.com
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ */
 package com.sshtools.universal;
 
 import java.io.ByteArrayOutputStream;
@@ -143,7 +162,7 @@ public class UniversalAuthenticatorClient {
 		SshKeyPair pair;
 		try {
 			pair = SshKeyPairGenerator.generateKeyPair(SshKeyPairGenerator.ECDSA, 521);
-			String key = SshKeyUtils.getFormattedKey(pair.getPublicKey(), "Desktop SSH Agent");
+			String key = SshKeyUtils.getFormattedKey(pair.getPublicKey(), "Universal Authenticator API");
 			String authorization = properties.getProperty("authorization", "");
 			byte[] newToken = pair.getPrivateKey().sign(generateToken(deviceName, username, 
 					key, 
@@ -197,23 +216,36 @@ public class UniversalAuthenticatorClient {
 	 */
 	public boolean verifyRegistration() throws IOException {
 
-		String username = properties.getProperty("username");
-		String token = properties.getProperty("authorization");
-		
-		if(Objects.isNull(username) || Objects.isNull(token)) {
-			throw new IOException("Username and token not set. Has this configuration been authorized?");
-		}
-		
-		String hostname = properties.getProperty("hostname");
-		
-		if(Objects.isNull(hostname)) {
-			throw new IOException("Hostname not set. Has this configuration been authorized?");
-		}
-		
+		try {
+			
+			SshKeyPair pair = SshKeyUtils.getPrivateKey(properties.getProperty("privateKey"), null);
+			long timestamp = System.currentTimeMillis();
+			String username = properties.getProperty("username");
+			String authorization = properties.getProperty("authorization");
+			
+			if(Objects.isNull(username) || Objects.isNull(authorization)) {
+				throw new IOException("Username and authorization not set. Has this configuration been authorized?");
+			}
+			
+			String hostname = properties.getProperty("hostname");
+			
+			if(Objects.isNull(hostname)) {
+				throw new IOException("Hostname not set. Has this configuration been authorized?");
+			}
+			
+			byte[] token = generateAuthorization(1, timestamp, authorization, username);
+			byte[] sig = pair.getPrivateKey().sign(token);
 
-		return isSuccess(fetchURL("/app/api/agent/check", 
-				new RequestParameter("username", username),
-				new RequestParameter("token", token)));
+			return isSuccess(fetchURL("/app/api/agent/check", 
+					new RequestParameter("username", username),
+					new RequestParameter("version", "1"),
+					new RequestParameter("token", authorization),
+					new RequestParameter("timestamp", String.valueOf(timestamp)),
+					new RequestParameter("signature", Base64.getUrlEncoder().encodeToString(sig))));
+		} catch (IOException | InvalidPassphraseException e) {
+			throw new IOException(e.getMessage(), e);
+		}
+
 	}
 	 
 	private boolean verifyDevice(String deviceName, String authorization) throws IOException {
@@ -278,8 +310,7 @@ public class UniversalAuthenticatorClient {
 	 */
 	public void authenticate(byte[] payload, String authorizationText) throws IOException {
 		
-		verifyRegistration();
-		
+
 		try {
 			SshPublicKey key = getSystemKey();
 			SshKeyPair pair = SshKeyUtils.getPrivateKey(properties.getProperty("privateKey"), null);
@@ -354,7 +385,6 @@ public class UniversalAuthenticatorClient {
 			String hostname = properties.getProperty("hostname", "gateway.sshtools.com");
 			
 			int port = Integer.parseInt(properties.getProperty("port", "443"));
-			boolean strictSSL = Boolean.parseBoolean(properties.getProperty("strictSSL", "true"));
 			boolean hasParameters = requestParameters.length > 0;
 			
 			String request = String.format("https://%s:%d%s", hostname, port, path);
@@ -466,12 +496,14 @@ public class UniversalAuthenticatorClient {
 	}
 	
 	public static void main(String[] args) throws IOException {
+
+
 		
 		UniversalAuthenticatorClient uac = new UniversalAuthenticatorClient();
-		uac.register("t1@jadaptive.com", "Some Device", "gateway2.sshtools.com");
-		
+		uac.register("lee@sshtools.com", "API Device", "dev.jadaptive.com");
+
 		uac.verifyRegistration();
 		
-		uac.authenticate("Some text");
+		uac.authenticate("The Universal Authentication API would like to authentcate you.");
 	}
 }
