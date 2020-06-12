@@ -41,7 +41,7 @@
 	</licenses>
 	<scm>
 		<url>https://github.com/ludup/universal-authenticator-api/</url>
-		<connection>https://github.com/ludup/universal-authenticator-api.git</connection>
+		<connection>scm:git:https://github.com/ludup/universal-authenticator-api.git</connection>
 	</scm>
 
 	<developers>
